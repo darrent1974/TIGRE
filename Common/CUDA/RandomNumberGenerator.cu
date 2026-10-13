@@ -52,17 +52,6 @@
 #include "gpuUtils.hpp"
 #include "RandomNumberGenerator.hpp"
 
-#define cudaCheckErrors(msg) \
-do { \
-        cudaError_t __err = cudaGetLastError(); \
-        if (__err != cudaSuccess) { \
-                mexPrintf("%s \n",msg);\
-                cudaDeviceReset();\
-                mexErrMsgIdAndTxt("RandomNumberGenerator:",cudaGetErrorString(__err));\
-        } \
-} while (0)
-
-
 __global__ void setup_kernel(curandState *state) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     /* Each thread gets same seed, a different sequence number, no offset */

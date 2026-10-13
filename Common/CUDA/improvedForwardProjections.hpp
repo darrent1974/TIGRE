@@ -20,17 +20,19 @@
  Coded by:           Stefanie Kaser, Benjamin Kirchmayer 
 --------------------------------------------------------------------------*/
 
-#include <cuda_runtime_api.h>
-#include <cuda.h>
-#include <iostream>
 #ifndef improvedForwardProjections_H
 #define improvedForwardProjections_H
+
 #define pi 3.14159265359
 #define eps 1e-8
 #define vecSizeCS 220
 #define vecSizeOut 100
 #define vecSizeIn 10
 #define maxthreads 256
+
+#include "TIGRE_common.hpp"
+#include <iostream>
+
 //#include <thrust/host_vector.h>
 //#include <thrust/device_vector.h>
 

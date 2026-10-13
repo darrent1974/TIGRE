@@ -54,16 +54,6 @@
 #include "TIGRE_common.hpp"
 #include <math.h>
 
-// https://stackoverflow.com/questions/16282136/is-there-a-cuda-equivalent-of-perror
-#define cudaCheckErrors(msg) \
-do { \
-        cudaError_t __err = cudaGetLastError(); \
-        if (__err != cudaSuccess) { \
-                mexPrintf("%s \n",msg);\
-                mexErrMsgIdAndTxt("CBCT:CUDA:Atb",cudaGetErrorString(__err));\
-        } \
-} while (0)
-    
     
 #define MAXTREADS 1024
     /*GEOMETRY DEFINITION

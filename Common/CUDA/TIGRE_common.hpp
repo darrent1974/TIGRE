@@ -22,3 +22,10 @@ void mexWarnMsgIdAndTxt(const char* pcTag, const char* pcMsg);
 #include "tmwtypes.h"
 #endif  // IS_TIGRE_FOR_PYTHON
 #endif  // _COMMON_HPP_20201017_
+
+#include "GpuIds.hpp"
+#include "types_TIGRE.hpp"
+
+void cudaCheckErrors(const char* msg, const char * filename = __FILE__, int lineno = __LINE__);
+void checkFreeMemory(const GpuIds& gpuids, size_t *mem_GPU_global, const char * filename = __FILE__, int lineno = __LINE__);
+void freeGeoArray(unsigned int splits,Geometry* geoArray);

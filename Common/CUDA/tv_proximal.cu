@@ -55,15 +55,7 @@
 #define BLOCK_SIZE 10  // BLOCK_SIZE^3 must be smaller than MAXTREADS
 
 #include "tv_proximal.hpp"
-#define cudaCheckErrors(msg) \
-do { \
-        cudaError_t __err = cudaGetLastError(); \
-        if (__err != cudaSuccess) { \
-                cudaDeviceReset();\
-                mexPrintf("%s \n",msg);\
-                        mexErrMsgIdAndTxt("CBCT:CUDA:TVdenoising",cudaGetErrorString(__err));\
-        } \
-} while (0)
+
 void cpy_from_host(float* device_array,float* host_array, 
                    unsigned long long bytes_device,unsigned long long offset_device,unsigned long long offset_host, 
                    unsigned long long pixels_per_slice, unsigned int buffer_length, 
@@ -647,27 +639,6 @@ void cpy_from_host(float* device_array,float* host_array,
         
     }
     
-
-void checkFreeMemory(const GpuIds& gpuids,size_t *mem_GPU_global){
-        size_t memfree;
-        size_t memtotal;
-        const int deviceCount = gpuids.GetLength();
-
-        for (int dev = 0; dev < deviceCount; dev++){
-            cudaSetDevice(gpuids[dev]);
-            cudaMemGetInfo(&memfree,&memtotal);
-            if(dev==0) *mem_GPU_global=memfree;
-            if(memfree<memtotal/2){
-                mexErrMsgIdAndTxt("tvDenoise:tvdenoising:GPU","One (or more) of your GPUs is being heavily used by another program (possibly graphics-based).\n Free the GPU to run TIGRE\n");
-            }
-            cudaCheckErrors("Check mem error");
-            
-            *mem_GPU_global=(memfree<*mem_GPU_global)?memfree:*mem_GPU_global;
-        }
-        *mem_GPU_global=(size_t)((double)*mem_GPU_global*0.95);
-        
-        //*mem_GPU_global= insert your known number here, in bytes.
-}
 
 void cpy_from_host(float* device_array,float* host_array, 
                    unsigned long long bytes_device,unsigned long long offset_device,unsigned long long offset_host, 

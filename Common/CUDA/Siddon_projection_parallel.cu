@@ -56,16 +56,6 @@
 #include "TIGRE_common.hpp"
 #include <math.h>
 
-#define cudaCheckErrors(msg) \
-do { \
-        cudaError_t __err = cudaGetLastError(); \
-        if (__err != cudaSuccess) { \
-                mexPrintf("%s \n",msg);\
-                mexErrMsgIdAndTxt("TIGRE:CUDA:Ax",cudaGetErrorString(__err));\
-        } \
-} while (0)
-    
-    
 // Declare the texture reference.
 void CreateTextureParallel(float* image,Geometry geo,cudaArray** d_cuArrTex, cudaTextureObject_t *texImage,cudaStream_t* stream);
 

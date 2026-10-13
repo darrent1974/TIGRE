@@ -21,22 +21,12 @@
 --------------------------------------------------------------------------*/
 
 
-#include <cuda.h>
-#include "mex.h"
-#include <cuda_runtime_api.h>
+//#include <cuda.h>
+//#include "mex.h"
+//#include <cuda_runtime_api.h>
 #include "improvedForwardProjections.hpp"
 // #include <algorithm>
 // #include <math.h>
-
-#define cudaCheckErrors(msg) \
-do { \
-        cudaError_t __err = cudaGetLastError(); \
-        if (__err != cudaSuccess) { \
-                mexPrintf("%s \n",msg);\
-                mexErrMsgIdAndTxt("ImprovedForwardProj:",cudaGetErrorString(__err));\
-        } \
-} while (0)
-
 
 __device__ int SolvePolynomialCone(float*x, float a, float b, float c){
     // Calculates real roots of a third-order polynomial function using Vieta's method and Cardano's method

@@ -54,19 +54,7 @@ Codes  : https://github.com/CERN/TIGRE
 #define MAXTHREADS 1024
 
 #include "PICCS.hpp"
-
-
-
-
-#define cudaCheckErrors(msg) \
-do { \
-        cudaError_t __err = cudaGetLastError(); \
-        if (__err != cudaSuccess) { \
-                mexPrintf("ERROR in: %s \n",msg);\
-                mexErrMsgIdAndTxt("err",cudaGetErrorString(__err));\
-        } \
-} while (0)
-    
+  
 // CUDA kernels
 //https://stackoverflow.com/questions/21332040/simple-cuda-kernel-optimization/21340927#21340927
     __global__ void divideArrayScalar(float* vec,float scalar,const size_t n)

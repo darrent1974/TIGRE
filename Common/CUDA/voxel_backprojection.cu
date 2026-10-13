@@ -51,18 +51,7 @@
 #include "TIGRE_common.hpp"
 #include <math.h>
 #include "GpuIds.hpp"
-
-// https://stackoverflow.com/questions/16282136/is-there-a-cuda-equivalent-of-perror
-#define cudaCheckErrors(msg) \
-do { \
-        cudaError_t __err = cudaGetLastError(); \
-        if (__err != cudaSuccess) { \
-                mexPrintf("%s \n",msg);\
-                mexErrMsgIdAndTxt("CBCT:CUDA:Atb",cudaGetErrorString(__err));\
-        } \
-} while (0)
-    
-    
+  
 #define MAXTREADS 1024
     /*GEOMETRY DEFINITION
      *
@@ -625,7 +614,7 @@ void splitCTbackprojection(const GpuIds& gpuids, Geometry geo,int nalpha, unsign
     // We don't know if the devices are being used. lets check that. and only use the amount of memory we need.
     
     size_t mem_GPU_global;
-    checkFreeMemory(gpuids, &mem_GPU_global);
+    checkFreeMemory(gpuids, &mem_GPU_global, "splitCTbackprojection");
 
     const int deviceCount = gpuids.GetLength();
         
@@ -740,19 +729,6 @@ void createGeoArray(unsigned int image_splits, Geometry geo,Geometry* geoArray, 
     }
     
 }
-//______________________________________________________________________________
-//
-//      Function:       freeGeoArray
-//
-//      Description:    Frees the memory from the geometry array for multiGPU.
-//______________________________________________________________________________
-void freeGeoArray(unsigned int splits,Geometry* geoArray){
-    for(unsigned int sp=0;sp<splits;sp++){
-        free(geoArray[sp].offOrigZ);
-    }
-    free(geoArray);
-}
-
 
 //______________________________________________________________________________
 //
@@ -897,24 +873,4 @@ void computeDeltasCube(Geometry geo,int i, Point3D* xyzorigin, Point3D* deltaX, 
     *S=source.to_float();
 }
 
-void checkFreeMemory(const GpuIds& gpuids,size_t *mem_GPU_global){
-    size_t memfree;
-    size_t memtotal;
-    const int deviceCount = gpuids.GetLength();
-    
-    for (int dev = 0; dev < deviceCount; dev++){
-        cudaSetDevice(gpuids[dev]);
-        cudaMemGetInfo(&memfree,&memtotal);
-        if(dev==0) *mem_GPU_global=memfree;
-        if(memfree<memtotal/2){
-            mexErrMsgIdAndTxt("voxel_backprojection:Atb:GPU","One (or more) of your GPUs is being heavily used by another program (possibly graphics-based).\n Free the GPU to run TIGRE\n");
-        }
-        cudaCheckErrors("Check mem error");
-        
-        *mem_GPU_global=(memfree<*mem_GPU_global)?memfree:*mem_GPU_global;
-    }
-    *mem_GPU_global=(size_t)((double)*mem_GPU_global*0.95);
-    
-    //*mem_GPU_global= insert your known number here, in bytes.
-}
 

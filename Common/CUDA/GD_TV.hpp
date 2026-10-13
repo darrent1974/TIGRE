@@ -57,5 +57,4 @@ Codes  : https://github.com/CERN/TIGRE
 
 void pocs_tv(float* img,float* dst,float alpha,const long* image_size, int maxIter, const GpuIds& gpuids);
 
-void checkFreeMemory(const GpuIds& gpuids, size_t *mem_GPU_global);
 #endif

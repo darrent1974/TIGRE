@@ -51,17 +51,6 @@
 #include "TIGRE_common.hpp"
 #include <math.h>
 #include "GpuIds.hpp"
-
-// https://stackoverflow.com/questions/16282136/is-there-a-cuda-equivalent-of-perror
-#define cudaCheckErrors(msg) \
-do { \
-        cudaError_t __err = cudaGetLastError(); \
-        if (__err != cudaSuccess) { \
-                mexPrintf("%s \n",msg);\
-                mexErrMsgIdAndTxt("CBCT:CUDA:Atb",cudaGetErrorString(__err));\
-        } \
-} while (0)
-    
     
 #define MAXTREADS 1024
     /*GEOMETRY DEFINITION
@@ -366,21 +355,32 @@ int voxel_backprojection2(float * projections, Geometry geo, float* result,float
     // We laredy queried the GPU and assuemd they are the same, thus should have the same attributes.
     int isHostRegisterSupported = 0;
 #if CUDART_VERSION >= 9020
-    cudaDeviceGetAttribute(&isHostRegisterSupported,cudaDevAttrHostRegisterSupported,gpuids[0]);
+    cudaDeviceGetAttribute(&isHostRegisterSupported,cudaDevAttrHostRegisterSupported,gpuids[0]);  
 #endif
-    // empirical testing shows that when the image split is smaller than 1 (also implies the image is not very big), the time to
-    // pin the memory is greater than the lost time in Synchronously launching the memcpys. This is only worth it when the image is too big.
-    if (isHostRegisterSupported & split_image>1){
-        cudaHostRegister(result, (size_t)geo.nVoxelX*(size_t)geo.nVoxelY*(size_t)geo.nVoxelZ*(size_t)sizeof(float),cudaHostRegisterPortable);
-    }
-    if (isHostRegisterSupported ){
-        cudaHostRegister(projections, (size_t)geo.nDetecU*(size_t)geo.nDetecV*(size_t)nalpha*(size_t)sizeof(float),cudaHostRegisterPortable);
-    }
-    cudaCheckErrors("Error pinning memory");
+    if (isHostRegisterSupported){
 
-    
-    
-    
+        // Try to get attributes before registration
+        cudaPointerAttributes attrProjections;
+        cudaPointerAttributes attrResult;
+        cudaError_t errProjections(cudaPointerGetAttributes(&attrProjections, projections));
+        cudaError_t errResult(cudaPointerGetAttributes(&attrResult, result));
+
+        if (attrResult.type == cudaMemoryTypeUnregistered) {
+            // empirical testing shows that when the image split is smaller than 1 (also implies the image is not very big), the time to
+            // pin the memory is greater than the lost time in Synchronously launching the memcpys. This is only worth it when the image is too big.
+            if (split_image>1){
+                cudaHostRegister(result, (size_t)geo.nVoxelX*(size_t)geo.nVoxelY*(size_t)geo.nVoxelZ*(size_t)sizeof(float),cudaHostRegisterPortable);
+                cudaCheckErrors("ccudaHostRegister result");
+            }
+        }
+
+        //if (attrProjections.type == cudaMemoryTypeUnregistered) 
+        //{        
+        //    cudaHostRegister(projections, (size_t)geo.nDetecU*(size_t)geo.nDetecV*(size_t)nalpha*(size_t)sizeof(float),cudaHostRegisterPortable);
+        //    cudaCheckErrors("ccudaHostRegister projections");
+        //}
+     
+    }
 
     //If it is the first time, lets make sure our image is zeroed.
     int nStreamDevice=2;
@@ -631,9 +631,9 @@ int voxel_backprojection2(float * projections, Geometry geo, float* result,float
     if (isHostRegisterSupported & split_image>1){
         cudaHostUnregister(result);
     }
-    if (isHostRegisterSupported){
-        cudaHostUnregister(projections);
-    }
+    //if (isHostRegisterSupported){
+    //    cudaHostUnregister(projections);
+    //}
 #endif 
     for (int i = 0; i < nStreams; ++i)
         cudaStreamDestroy(stream[i]);
@@ -697,148 +697,4 @@ void CreateTexture2(const GpuIds& gpuids, float* projectiondata,Geometry geo,cud
         cudaCreateTextureObject(&texImage[dev], &texRes, &texDescr, NULL);
     }
 }
-#ifndef BACKPROJECTION_HPP
-void splitCTbackprojection(const GpuIds& gpuids, Geometry geo,int nalpha, unsigned int* split_image, unsigned int * split_projections){
-    
-    
-    // We don't know if the devices are being used. lets check that. and only use the amount of memory we need.
-    
-    size_t mem_GPU_global;
-    checkFreeMemory(gpuids, &mem_GPU_global);
-    const int deviceCount = gpuids.GetLength();
-    
-    // Compute how much memory each of the relevant memory pieces need
-    size_t mem_image=       (unsigned long long)geo.nVoxelX*(unsigned long long)geo.nVoxelY*(unsigned long long)geo.nVoxelZ*sizeof(float);
-    size_t mem_proj=        (unsigned long long)geo.nDetecU*(unsigned long long)geo.nDetecV*sizeof(float);
-    
-    
-    
-    
-    // Does everything fit in the GPU?
-    
-    if(mem_image/deviceCount+mem_proj*PROJ_PER_KERNEL*2<mem_GPU_global){
-        // We only need to split if we have extra GPUs
-        *split_image=1;
-        *split_projections=1;
-    }
-    // We know we need to split, but:
-    // Does all the image fit in the GPU, with some slack for a stack of projections??
-    else
-    {
-        // As we can overlap memcpys from H2D of the projections, we should then minimize the amount of image splits.
-        // Lets assume to start with that we only need 1 stack of PROJ_PER_KERNEL projections. The rest is for the image.
-        size_t mem_free=mem_GPU_global-2*mem_proj*PROJ_PER_KERNEL;
-        
-        *split_image=(mem_image/deviceCount+mem_free-1)/mem_free;
-        // Now knowing how many splits we have for images, we can recompute how many slices of projections actually
-        // fit on the GPU. Must be more than 0 obviously.
-        
-        mem_free=mem_GPU_global-(mem_image/deviceCount)/(*split_image); // NOTE: There is some rounding error, but its in the order of bytes, and we have 5% of GPU free jsut in case. We are safe
-        
-        
-        *split_projections=(mem_proj*PROJ_PER_KERNEL*2+mem_free-1)/mem_free;
-        
-    }
-}
 
-
-void computeDeltasCube(Geometry geo,int i, Point3D* xyzorigin, Point3D* deltaX, Point3D* deltaY, Point3D* deltaZ,Point3D* S)
-{
-    Point3Ddouble P, Px,Py,Pz;
-    // Get coords of Img(0,0,0)
-    P.x=-(geo.sVoxelX/2-geo.dVoxelX/2)+geo.offOrigX[i];
-    P.y=-(geo.sVoxelY/2-geo.dVoxelY/2)+geo.offOrigY[i];
-    P.z=-(geo.sVoxelZ/2-geo.dVoxelZ/2)+geo.offOrigZ[i];
-    
-    // Get coors from next voxel in each direction
-    Px.x=P.x+geo.dVoxelX;      Py.x=P.x;                Pz.x=P.x;
-    Px.y=P.y;                   Py.y=P.y+geo.dVoxelY;    Pz.y=P.y;
-    Px.z=P.z;                   Py.z=P.z;                Pz.z=P.z+geo.dVoxelZ;
-    
-    
-    
-// Rotate image around X axis (this is equivalent of rotating the source and detector) RZ RY RZ
-    
-    eulerZYZT(geo,&P);
-    eulerZYZT(geo,&Px);
-    eulerZYZT(geo,&Py);
-    eulerZYZT(geo,&Pz);
-    
-    
-    
-    //detector offset
-    P.z =P.z-geo.offDetecV[i];            P.y =P.y-geo.offDetecU[i];
-    Px.z =Px.z-geo.offDetecV[i];          Px.y =Px.y-geo.offDetecU[i];
-    Py.z =Py.z-geo.offDetecV[i];          Py.y =Py.y-geo.offDetecU[i];
-    Pz.z =Pz.z-geo.offDetecV[i];          Pz.y =Pz.y-geo.offDetecU[i];
-    
-    //Detector Roll pitch Yaw
-    //
-    //
-    // first, we need to offset everything so (0,0,0) is the center of the detector
-    // Only X is required for that
-    P.x=P.x+(geo.DSD[i]-geo.DSO[i]);
-    Px.x=Px.x+(geo.DSD[i]-geo.DSO[i]);
-    Py.x=Py.x+(geo.DSD[i]-geo.DSO[i]);
-    Pz.x=Pz.x+(geo.DSD[i]-geo.DSO[i]);
-    rollPitchYawT(geo,i,&P);
-    rollPitchYawT(geo,i,&Px);
-    rollPitchYawT(geo,i,&Py);
-    rollPitchYawT(geo,i,&Pz);
-    
-    P.x=P.x-(geo.DSD[i]-geo.DSO[i]);
-    Px.x=Px.x-(geo.DSD[i]-geo.DSO[i]);
-    Py.x=Py.x-(geo.DSD[i]-geo.DSO[i]);
-    Pz.x=Pz.x-(geo.DSD[i]-geo.DSO[i]);
-    //Done for P, now source
-    Point3Ddouble source;
-    source.x=geo.DSD[i]; //already offseted for rotation
-    source.y=-geo.offDetecU[i];
-    source.z=-geo.offDetecV[i];
-    rollPitchYawT(geo,i,&source);
-    
-    
-    source.x=source.x-(geo.DSD[i]-geo.DSO[i]);//   source.y=source.y-auxOff.y;    source.z=source.z-auxOff.z;
-    
-//       mexPrintf("%f,%f,%f\n",source.x,source.y,source.z);
-    // Scale coords so detector pixels are 1x1
-    
-    P.z =P.z /geo.dDetecV;                          P.y =P.y/geo.dDetecU;
-    Px.z=Px.z/geo.dDetecV;                          Px.y=Px.y/geo.dDetecU;
-    Py.z=Py.z/geo.dDetecV;                          Py.y=Py.y/geo.dDetecU;
-    Pz.z=Pz.z/geo.dDetecV;                          Pz.y=Pz.y/geo.dDetecU;
-    
-    source.z=source.z/geo.dDetecV;                  source.y=source.y/geo.dDetecU;
-    
-    // get deltas of the changes in voxels
-    deltaX->x=Px.x-P.x;   deltaX->y=Px.y-P.y;    deltaX->z=Px.z-P.z;
-    deltaY->x=Py.x-P.x;   deltaY->y=Py.y-P.y;    deltaY->z=Py.z-P.z;
-    deltaZ->x=Pz.x-P.x;   deltaZ->y=Pz.y-P.y;    deltaZ->z=Pz.z-P.z;
-    
-    
-    *xyzorigin=P.to_float();
-    *S=source.to_float();
-}  // END computeDeltasCube
-
-void checkFreeMemory(const GpuIds& gpuids,size_t *mem_GPU_global){
-    size_t memfree;
-    size_t memtotal;
-    const int gpuids.GetLength();
-    
-    for (int dev = 0; dev < deviceCount; dev++){
-        cudaSetDevice(gpuids[dev]);
-        cudaMemGetInfo(&memfree,&memtotal);
-        if(dev==0) *mem_GPU_global=memfree;
-        if(memfree<memtotal/2){
-            mexErrMsgIdAndTxt("voxel_backprojection:Atb:GPU","One (or more) of your GPUs is being heavily used by another program (possibly graphics-based).\n Free the GPU to run TIGRE\n");
-        }
-        cudaCheckErrors("Check mem error");
-        
-        *mem_GPU_global=(memfree<*mem_GPU_global)?memfree:*mem_GPU_global;
-    }
-    *mem_GPU_global=(size_t)((double)*mem_GPU_global*0.95);
-    
-    //*mem_GPU_global= insert your known number here, in bytes.
-}
-
-#endif

@@ -54,16 +54,6 @@
 #include "TIGRE_common.hpp"
 #include <math.h>
 
-#define cudaCheckErrors(msg) \
-do { \
-        cudaError_t __err = cudaGetLastError(); \
-        if (__err != cudaSuccess) { \
-                mexPrintf("%s \n",msg);\
-                mexErrMsgIdAndTxt("Ax:Siddon_projection",cudaGetErrorString(__err));\
-        } \
-} while (0)
-    
-    
 #define MAXTREADS 1024
 #define PROJ_PER_BLOCK 9
 #define PIXEL_SIZE_BLOCK 9
@@ -817,43 +807,5 @@ void eulerZYZ(Geometry geo, Point3D* point){
             cos(geo.theta)*auxPoint.z;
     
     
-}
-//______________________________________________________________________________
-//
-//      Function:       freeGeoArray
-//
-//      Description:    Frees the memory from the geometry array for multiGPU.
-//______________________________________________________________________________
-void freeGeoArray(unsigned int splits,Geometry* geoArray){
-    for(unsigned int sp=0;sp<splits;sp++){
-        free(geoArray[sp].offOrigZ);
-    }
-    free(geoArray);
-}
-//______________________________________________________________________________
-//
-//      Function:       checkFreeMemory
-//
-//      Description:    check available memory on devices
-//______________________________________________________________________________
-void checkFreeMemory(const GpuIds& gpuids, size_t *mem_GPU_global){
-    size_t memfree;
-    size_t memtotal;
-    const int deviceCount = gpuids.GetLength();
-
-    for (int dev = 0; dev < deviceCount; dev++){
-        cudaSetDevice(gpuids[dev]);
-        cudaMemGetInfo(&memfree,&memtotal);
-        if(dev==0) *mem_GPU_global=memfree;
-        if(memfree<memtotal/2){
-            mexErrMsgIdAndTxt("Ax:Siddon_projection:GPUmemory","One (or more) of your GPUs is being heavily used by another program (possibly graphics-based).\n Free the GPU to run TIGRE\n");
-        }
-        cudaCheckErrors("Check mem error");
-        
-        *mem_GPU_global=(memfree<*mem_GPU_global)?memfree:*mem_GPU_global;
-    }
-    *mem_GPU_global=(size_t)((double)*mem_GPU_global*0.95);
-    
-    //*mem_GPU_global= insert your known number here, in bytes.
 }
 #endif

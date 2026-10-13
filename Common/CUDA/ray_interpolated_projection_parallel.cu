@@ -56,17 +56,6 @@
 #include "TIGRE_common.hpp"
 #include <math.h>
 
-#define cudaCheckErrors(msg) \
-do { \
-        cudaError_t __err = cudaGetLastError(); \
-        if (__err != cudaSuccess) { \
-                mexPrintf("%s \n",msg);\
-                mexErrMsgIdAndTxt("TIGRE:Ax:interpolated_parallel",cudaGetErrorString(__err));\
-        } \
-} while (0)
-    
-    
-
 #define MAXTREADS 1024
 #define PROJ_PER_BLOCK 8
 #define PIXEL_SIZE_BLOCK 8
